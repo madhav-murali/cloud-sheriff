@@ -13,7 +13,7 @@
 ---
 
 ## How to view the design
-
+[View the Design Document](./design-doc.html)
 Download `design-doc.html` and open it in any modern browser (Chrome, Firefox, Edge). No build step or dependencies required.
 
 The document has five tabs:
