@@ -1,7 +1,4 @@
-# IAM Permissions Explorer — Design Assignment
-
-A product design submission for the IAM Permissions Explorer assignment. The goal: design a tool that helps identify and fix excessive or unused cloud IAM permissions.
-
+# IAM Permissions Explorer 
 ---
 
 ## What's in this repo
