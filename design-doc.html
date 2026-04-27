@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IAM Permissions Explorer — Design Document</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #1c2333;
+    --bg4: #21262d;
+    --border: #30363d;
+    --border2: #444c56;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #6e7681;
+    --accent: #58a6ff;
+    --accent2: #1f6feb;
+    --green: #3fb950;
+    --green2: #238636;
+    --red: #f85149;
+    --red2: #da3633;
+    --amber: #e3b341;
+    --amber2: #9e6a03;
+    --teal: #39d353;
+    --purple: #bc8cff;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'DM Sans', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: .04em;
+    white-space: nowrap;
+  }
+  .topbar-logo span { color: var(--text3); }
+  .topbar-meta {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--mono);
+    font-weight: 500;
+    background: rgba(88,166,255,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(88,166,255,0.3);
+  }
+
+  /* ── NAV TABS ── */
+  .nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+  }
+  .nav-tab {
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color .2s, border-color .2s;
+    user-select: none;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── PAGE ── */
+  .page { display: none; }
+  .page.active { display: block; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 32px; }
+
+  /* ── SECTION HEADINGS ── */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1 { font-size: 28px; font-weight: 600; line-height: 1.3; margin-bottom: 8px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+  h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  p { color: var(--text2); margin-bottom: 16px; line-height: 1.75; }
+  strong { color: var(--text); font-weight: 600; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card-sm { padding: 16px; }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+
+  /* ── PERSONA ── */
+  .persona-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .persona-avatar {
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1f6feb, #238636);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+  .persona-title { font-size: 18px; font-weight: 600; }
+  .persona-sub { font-size: 13px; color: var(--text3); font-family: var(--mono); }
+
+  /* ── PAIN POINTS ── */
+  .pain-item {
+    display: flex; gap: 14px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .pain-item:last-child { border-bottom: none; }
+  .pain-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(248,81,73,0.15);
+    border: 1px solid rgba(248,81,73,0.4);
+    color: var(--red);
+    font-family: var(--mono);
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .pain-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .pain-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+  /* ── QUOTE BLOCK ── */
+  .quote {
+    border-left: 3px solid var(--accent2);
+    padding: 12px 16px;
+    background: rgba(31,111,235,0.07);
+    border-radius: 0 6px 6px 0;
+    margin: 16px 0;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text2);
+  }
+
+  /* ── WIREFRAMES ── */
+  .wf-container {
+    background: #0a0e13;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    font-family: var(--sans);
+  }
+  .wf-titlebar {
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .wf-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .wf-screen-label {
+    margin-left: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .wf-inner { padding: 0; }
+
+  /* sidebar */
+  .wf-layout { display: flex; min-height: 520px; }
+  .wf-sidebar {
+    width: 200px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    flex-shrink: 0;
+  }
+  .wf-sidebar-logo {
+    padding: 4px 16px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: .04em;
+  }
+  .wf-nav-item {
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-left: 2px solid transparent;
+  }
+  .wf-nav-item.active { color: var(--text); background: rgba(255,255,255,0.04); border-left-color: var(--accent); }
+  .wf-nav-icon { width: 14px; height: 14px; opacity: 0.6; }
+  .wf-content { flex: 1; padding: 20px; overflow: auto; }
+
+  /* Metric cards in wireframe */
+  .wf-metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .wf-metric {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    position: relative;
+  }
+  .wf-metric-label { font-size: 10px; color: var(--text3); font-family: var(--mono); letter-spacing: .06em; margin-bottom: 6px; }
+  .wf-metric-value { font-size: 22px; font-weight: 600; font-family: var(--mono); }
+  .wf-metric-sub { font-size: 10px; color: var(--text3); margin-top: 4px; }
+  .val-red { color: var(--red); }
+  .val-amber { color: var(--amber); }
+  .val-green { color: var(--green); }
+  .val-blue { color: var(--accent); }
+
+  /* Risk bar */
+  .wf-section-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .wf-section-head span { font-size: 13px; font-weight: 600; }
+  .wf-section-head small { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+  /* Table in wireframe */
+  .wf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .wf-table th {
+    text-align: left; padding: 8px 10px;
+    font-size: 10px; font-family: var(--mono); letter-spacing: .06em;
+    color: var(--text3);
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  .wf-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+    color: var(--text2);
+    vertical-align: middle;
+  }
+  .wf-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .risk-pill {
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-family: var(--mono); font-weight: 600;
+  }
+  .risk-critical { background: rgba(248,81,73,0.18); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+  .risk-high { background: rgba(227,179,65,0.18); color: var(--amber); border: 1px solid rgba(227,179,65,0.3); }
+  .risk-med { background: rgba(88,166,255,0.12); color: var(--accent); border: 1px solid rgba(88,166,255,0.25); }
+  .risk-low { background: rgba(63,185,80,0.12); color: var(--green); border: 1px solid rgba(63,185,80,0.25); }
+
+  .usage-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .usage-bar { height: 6px; border-radius: 3px; flex: 1; background: var(--bg4); overflow: hidden; }
+  .usage-fill { height: 100%; border-radius: 3px; }
+  .fill-red { background: var(--red); }
+  .fill-amber { background: var(--amber); }
+  .fill-green { background: var(--green); }
+  .usage-pct { font-family: var(--mono); font-size: 10px; color: var(--text3); min-width: 28px; }
+
+  /* PCI donut mock */
+  .pci-row { display: grid; grid-template-columns: 140px 1fr; gap: 16px; align-items: center; }
+  .pci-donut {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: conic-gradient(var(--red) 0% 28%, var(--amber) 28% 55%, var(--green) 55% 100%);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    margin: 0 auto;
+  }
+  .pci-donut-inner {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: var(--bg3);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+  }
+  .pci-score { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--amber); }
+  .pci-sub { font-size: 9px; color: var(--text3); }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); margin-bottom: 6px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Inheritance graph mock */
+  .inherit-graph {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 11px;
+  }
+  .inherit-node {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 5px;
+    font-family: var(--mono); font-size: 11px;
+    border: 1px solid;
+  }
+  .n-scp { background: rgba(188,140,255,0.12); color: var(--purple); border-color: rgba(188,140,255,0.3); }
+  .n-policy { background: rgba(88,166,255,0.12); color: var(--accent); border-color: rgba(88,166,255,0.3); }
+  .n-role { background: rgba(63,185,80,0.12); color: var(--green); border-color: rgba(63,185,80,0.3); }
+  .n-user { background: rgba(227,179,65,0.12); color: var(--amber); border-color: rgba(227,179,65,0.3); }
+  .inherit-line {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0;
+  }
+  .iline { flex: 1; height: 1px; background: var(--border); position: relative; }
+  .iline::after {
+    content: '▶';
+    position: absolute; right: -2px; top: -6px;
+    font-size: 8px; color: var(--text3);
+  }
+
+  /* JSON diff mock */
+  .diff-pane {
+    background: #0a0e13;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    overflow: hidden;
+  }
+  .diff-header {
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .diff-header-label { font-size: 11px; color: var(--text2); }
+  .diff-stat { font-size: 10px; font-family: var(--mono); }
+  .diff-body { padding: 10px 0; }
+  .diff-line {
+    padding: 2px 12px;
+    display: flex; align-items: flex-start; gap: 8px;
+    line-height: 1.7;
+  }
+  .diff-line.add { background: rgba(63,185,80,0.1); }
+  .diff-line.del { background: rgba(248,81,73,0.1); }
+  .diff-sign { width: 12px; flex-shrink: 0; font-weight: 700; }
+  .diff-sign.add { color: var(--green); }
+  .diff-sign.del { color: var(--red); }
+  .diff-sign.neu { color: var(--text3); }
+  .diff-code { color: var(--text2); }
+  .diff-code .key { color: var(--accent); }
+  .diff-code .str { color: #79c0ff; }
+  .diff-code .wc { color: var(--red); }
+  .diff-code .wc2 { color: var(--green); }
+
+  /* Action buttons in wireframe */
+  .wf-btn {
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid;
+  }
+  .btn-primary { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+  .btn-ghost { background: transparent; color: var(--text2); border-color: var(--border); }
+  .btn-danger { background: rgba(218,54,51,0.15); color: var(--red); border-color: rgba(218,54,51,0.4); }
+
+  /* ── ANNOTATION SYSTEM ── */
+  .annotation-wrap { position: relative; }
+  .annotation {
+    display: flex; gap: 12px; margin: 8px 0;
+    padding: 10px 12px;
+    background: rgba(88,166,255,0.06);
+    border: 1px dashed rgba(88,166,255,0.3);
+    border-radius: 6px;
+  }
+  .ann-num {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--accent2);
+    color: #fff; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .ann-text { font-size: 12px; color: var(--text2); line-height: 1.6; }
+  .ann-text strong { color: var(--accent); }
+
+  /* ── FEATURE WRITE-UP ── */
+  .feature-row {
+    display: flex; gap: 12px; padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .feature-row:last-child { border-bottom: none; }
+  .feature-priority {
+    width: 48px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+  }
+  .priority-num {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+  }
+  .p1 { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+  .p2 { background: rgba(227,179,65,0.15); color: var(--amber); border: 1px solid rgba(227,179,65,0.3); }
+  .p3 { background: rgba(88,166,255,0.12); color: var(--accent); border: 1px solid rgba(88,166,255,0.25); }
+  .priority-label { font-size: 9px; color: var(--text3); font-family: var(--mono); }
+  .feature-body { flex: 1; }
+  .feature-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .feature-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .feature-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-family: var(--mono);
+    background: var(--bg3); color: var(--text3);
+    border: 1px solid var(--border);
+  }
+
+  /* KPI table */
+  .kpi-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .kpi-table th {
+    text-align: left; padding: 10px 14px;
+    font-size: 10px; font-family: var(--mono); letter-spacing: .08em;
+    color: var(--text3); border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+  .kpi-table td {
+    padding: 12px 14px; border-bottom: 1px solid rgba(48,54,61,0.6);
+    color: var(--text2); vertical-align: top;
+  }
+  .kpi-table td:first-child { color: var(--text); font-weight: 500; }
+  .kpi-name { font-family: var(--mono); font-size: 12px; }
+
+  /* Dev action items */
+  .task-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    display: flex; gap: 16px;
+  }
+  .task-num {
+    width: 36px; height: 36px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 14px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .t-backend { background: rgba(188,140,255,0.15); color: var(--purple); border: 1px solid rgba(188,140,255,0.3); }
+  .t-frontend { background: rgba(63,185,80,0.12); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+  .task-body { flex: 1; }
+  .task-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .task-meta { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .task-desc { font-size: 13px; color: var(--text2); line-height: 1.7; margin-bottom: 12px; }
+  .task-checklist { list-style: none; font-size: 12px; color: var(--text2); }
+  .task-checklist li { display: flex; gap: 8px; padding: 3px 0; }
+  .task-checklist li::before { content: '□'; font-size: 12px; color: var(--text3); flex-shrink: 0; }
+  .code-inline {
+    background: var(--bg4); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 3px;
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+  }
+
+  /* slider annotation */
+  .wf-slider-row { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+  .wf-slider { flex: 1; height: 4px; background: var(--bg4); border-radius: 2px; position: relative; }
+  .wf-slider-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--amber) 60%, var(--red)); border-radius: 2px; width: 65%; }
+  .wf-slider-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--text); position: absolute; top: -5px; left: 65%; transform: translateX(-50%); border: 2px solid var(--bg); }
+  .wf-slider-label { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+
+  /* Screen nav */
+  .screen-nav {
+    display: flex; gap: 8px; margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .screen-nav-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--text2);
+    transition: all .2s;
+    user-select: none;
+  }
+  .screen-nav-btn:hover { background: var(--bg4); color: var(--text); }
+  .screen-nav-btn.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+  .wf-screen { display: none; }
+  .wf-screen.active { display: block; }
+
+  /* horizontal divider */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  /* Summary header box */
+  .summary-box {
+    background: linear-gradient(135deg, rgba(31,111,235,0.15), rgba(35,134,54,0.08));
+    border: 1px solid rgba(31,111,235,0.3);
+    border-radius: 10px;
+    padding: 28px 32px;
+    margin-bottom: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .summary-box::before {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(88,166,255,0.08), transparent 70%);
+    pointer-events: none;
+  }
+
+  /* scroll helper */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+  @media print {
+    .topbar, .nav { position: static; }
+    .page { display: block !important; }
+    .page + .page { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">▣ IAM<span>/</span>permissions-explorer</div>
+  <div class="topbar-meta">
+    <span class="badge">Design Document v1.0</span>
+    <span>Product Design · Cloud Security</span>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav" id="mainNav">
+  <div class="nav-tab active" data-page="overview">01 · Problem Statement</div>
+  <div class="nav-tab" data-page="persona">02 · User Persona</div>
+  <div class="nav-tab" data-page="wireframes">03 · Wireframes</div>
+  <div class="nav-tab" data-page="features">04 · Features & KPIs</div>
+  <div class="nav-tab" data-page="dev">05 · Dev Action Items</div>
+</div>
+
+<!-- ════════════════ PAGE 1: OVERVIEW ════════════════ -->
+<div class="page active" id="page-overview">
+<div class="container">
+
+  <div class="summary-box">
+    <div class="section-label">Problem Statement</div>
+    <h1>IAM Permissions Explorer</h1>
+    <p style="color:var(--text); font-size:16px; margin-bottom: 0; max-width:720px;">
+      A design brief for identifying and remediating excessive or unused cloud IAM permissions — bridging the gap between what identities <em>can</em> access and what they <em>actually use</em>.
+    </p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-label">The Crisis</div>
+      <h2>The Entitlement Problem</h2>
+      <p>Cloud environments grant permissions far faster than they revoke them. The result: identities accumulate massive, mostly-unused access over time — creating an attack surface that grows invisibly.</p>
+      <p>Industry analysis shows <strong>75% of security failures by end of 2023</strong> result from inadequate management of identities and privileges. Research from Microsoft's Entra team confirms the majority of granted cloud permissions go entirely <strong>unused</strong>.</p>
+      <div class="quote">
+        "Dormant entitlements constitute a vast, unnecessary attack surface that threat actors actively exploit to escalate privileges and facilitate lateral movement."
+      </div>
+      <p style="margin-bottom:0;">Yet enforcing least privilege at scale is <strong>notoriously difficult</strong> — not because engineers lack intent, but because the tooling fails them.</p>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Why Current Tools Fall Short</div>
+      <h2>The Visibility Gap</h2>
+      <p>The core engineering challenge is a <strong>Gap Analysis</strong>: identifying the delta between what IAM policies say an identity can do versus what telemetry logs record it actually doing.</p>
+      <p>This sounds simple. In practice it is plagued by:</p>
+      <div class="pain-item" style="padding-top:0; padding-bottom:12px;">
+        <div>
+          <div class="pain-title" style="color:var(--amber);">Taxonomical misalignment</div>
+          <div class="pain-body">IAM service prefixes differ from CloudTrail API prefixes. <span class="code-inline">ses</span> in IAM → <span class="code-inline">email</span> in logs. Action names diverge. <span class="code-inline">s3:ListAllMyBuckets</span> vs the CLI call <span class="code-inline">aws s3 ls</span>.</div>
+        </div>
+      </div>
+      <div class="pain-item" style="padding-bottom:12px;">
+        <div>
+          <div class="pain-title" style="color:var(--amber);">Telemetry blind spots</div>
+          <div class="pain-body">CloudTrail omits high-volume data events (S3 GetObject, Lambda invocations) by default. Some actions like <span class="code-inline">CloudWatch:PutMetricData</span> are never recorded at all.</div>
+        </div>
+      </div>
+      <div class="pain-item">
+        <div>
+          <div class="pain-title" style="color:var(--amber);">API versioning mutations</div>
+          <div class="pain-body">Legacy SDK calls append version strings: <span class="code-inline">ListDistributions2017_03_25</span>. A robust tool needs regex or ML classifiers to normalise these back to root IAM actions.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 4px;">
+    <div class="section-label">Design Goal</div>
+    <h2>What This Tool Must Do</h2>
+    <div class="grid-3">
+      <div>
+        <h3 style="color:var(--accent);">① Visualise</h3>
+        <p>Translate raw log-policy delta into intuitive executive-level metrics (PCI, Risk Margin) and interactive inheritance graphs — not raw JSON arrays.</p>
+      </div>
+      <div>
+        <h3 style="color:var(--green);">② Remediate</h3>
+        <p>Automatically generate least-privilege replacement policies. Show a side-by-side diff so engineers can validate changes before deploying. One-click export to IaC.</p>
+      </div>
+      <div>
+        <h3 style="color:var(--amber);">③ Empower</h3>
+        <p>Give developers self-service policy generation. Break the centralised bottleneck where a single security team reviews every policy request — a known velocity killer.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ════════════════ PAGE 2: PERSONA ════════════════ -->
+<div class="page" id="page-persona">
+<div class="container">
+
+  <div class="section-label">User Persona</div>
+  <h1 style="margin-bottom: 24px;">Primary Operator</h1>
+
+  <div class="card" style="margin-bottom: 24px;">
+    <div class="persona-header">
+      <div class="persona-avatar">SC</div>
+      <div>
+        <div class="persona-title">Sarah Chen</div>
+        <div class="persona-sub">Senior Cloud Security Engineer · AWS + Azure · 6 yrs exp</div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <h3 style="margin-bottom: 10px;">Background</h3>
+        <p>Sarah sits at the intersection of security governance and developer velocity. She owns IAM policy reviews, compliance audits, and incident response — while simultaneously being the person developers blame when deployments are slow.</p>
+        <p>She manages permissions for <strong>3,000+ identities</strong> across two cloud environments. She uses the AWS console daily, has scripted her own ad-hoc gap analyses in Python, and is deeply familiar with CloudTrail. She distrusts "magic" automation because she has seen it break production.</p>
+      </div>
+      <div>
+        <h3 style="margin-bottom: 10px;">Goals</h3>
+        <div class="pain-item" style="padding-top:0;">
+          <div class="pain-num" style="background:rgba(63,185,80,0.15);border-color:rgba(63,185,80,0.4);color:var(--green);">G</div>
+          <div>
+            <div class="pain-title">Pass the next SOC2 audit</div>
+            <div class="pain-body">Needs evidence that orphaned accounts have been cleaned up and least privilege is enforced across all environments.</div>
+          </div>
+        </div>
+        <div class="pain-item">
+          <div class="pain-num" style="background:rgba(63,185,80,0.15);border-color:rgba(63,185,80,0.4);color:var(--green);">G</div>
+          <div>
+            <div class="pain-title">Reduce her policy review backlog</div>
+            <div class="pain-body">Currently 40+ open IAM policy requests from developers. Each one requires manual context-gathering that takes 30–90 minutes.</div>
+          </div>
+        </div>
+        <div class="pain-item">
+          <div class="pain-num" style="background:rgba(63,185,80,0.15);border-color:rgba(63,185,80,0.4);color:var(--green);">G</div>
+          <div>
+            <div class="pain-title">Not be the reason a service went down</div>
+            <div class="pain-body">Her deepest fear: an automated policy revocation breaks a critical production job that only runs once a quarter.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-bottom: 16px;">Three Core Pain Points</h2>
+
+  <div class="card" style="margin-bottom: 16px;">
+    <div class="pain-item" style="padding-top:0;">
+      <div class="pain-num">01</div>
+      <div>
+        <div class="pain-title">Fear of breaking production</div>
+        <div class="pain-body">
+          A role that has only used read permissions for 89 days might need write access on day 90 for a quarterly batch job. Traditional gap analysis tools have no predictive context. When stakes of an outage far outweigh the abstract risk of an over-permissioned account, the default posture degrades to "allow all."<br><br>
+          <strong>Design implication:</strong> Every remediation suggestion must show <em>confidence signals</em> — last-used timestamp, usage frequency heatmap, inferred job schedule — not just "this was unused."
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 16px;">
+    <div class="pain-item" style="padding-top:0;">
+      <div class="pain-num">02</div>
+      <div>
+        <div class="pain-title">Hidden dependencies and inheritance complexity</div>
+        <div class="pain-body">
+          A developer's effective permissions derive from a labyrinthine chain: Active Directory groups → assumed cross-account IAM roles → nested Resource-Based Policies → Permission Boundaries → Service Control Policies. When the source of a privilege is obfuscated, engineers hesitate to alter anything.<br><br>
+          Machine identities make this worse — CI pipelines, Lambda functions, and containers rotate rapidly and have wildly different scopes than humans.<br><br>
+          <strong>Design implication:</strong> The tool must visualise the <em>full inheritance chain</em> for any selected identity — not just the attached policies.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="pain-item" style="padding-top:0;">
+      <div class="pain-num">03</div>
+      <div>
+        <div class="pain-title">Centralisation bottleneck and developer friction</div>
+        <div class="pain-body">
+          When a central security team must manually review all IAM policies, they become the primary bottleneck. Developers — lacking context on what permissions they actually need — request wildcard policies (<span class="code-inline">s3:*</span>) to guarantee nothing breaks. The security team, lacking application context, cannot meaningfully push back.<br><br>
+          This creates an adversarial dynamic characterised by delayed deployments and mutual distrust.<br><br>
+          <strong>Design implication:</strong> Developers must be able to <em>self-serve</em> scoped policy generation using their activity logs, without going through the security team for initial drafts.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 24px; background: rgba(31,111,235,0.06); border-color: rgba(31,111,235,0.25);">
+    <div class="section-label">Secondary Personas</div>
+    <div class="grid-2" style="gap: 16px; margin-top: 8px;">
+      <div>
+        <h3 style="margin-bottom: 6px; font-size: 13px;">Application Developer</h3>
+        <p style="font-size: 13px; margin-bottom: 0;">Needs to understand why their deployment failed (AccessDenied) and self-generate the minimum policy required. Values speed, not security depth.</p>
+      </div>
+      <div>
+        <h3 style="margin-bottom: 6px; font-size: 13px;">CISO / Security Director</h3>
+        <p style="font-size: 13px; margin-bottom: 0;">Needs a single-number risk posture score to report to the board. Does not want to read policy JSON — wants trend lines and compliance percentages.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ════════════════ PAGE 3: WIREFRAMES ════════════════ -->
+<div class="page" id="page-wireframes">
+<div class="container">
+
+  <div class="section-label">Wireframes</div>
+  <h1 style="margin-bottom: 8px;">3-Screen Design</h1>
+  <p style="max-width: 680px;">Three interconnected screens covering discovery → investigation → remediation. Click between screens using the controls below. Annotations explain key design decisions.</p>
+
+  <div class="screen-nav" id="screenNav">
+    <div class="screen-nav-btn active" data-screen="s1">Screen 1 — Risk Dashboard</div>
+    <div class="screen-nav-btn" data-screen="s2">Screen 2 — Identity Deep Dive</div>
+    <div class="screen-nav-btn" data-screen="s3">Screen 3 — Remediation Diff</div>
+  </div>
+
+  <!-- ── SCREEN 1: DASHBOARD ── -->
+  <div class="wf-screen active" id="wf-s1">
+    <div class="wf-container">
+      <div class="wf-titlebar">
+        <div class="wf-dot" style="background:#ff5f57;"></div>
+        <div class="wf-dot" style="background:#febc2e;"></div>
+        <div class="wf-dot" style="background:#28c840;"></div>
+        <div class="wf-screen-label">IAM Permissions Explorer · Dashboard</div>
+      </div>
+      <div class="wf-layout">
+        <!-- Sidebar -->
+        <div class="wf-sidebar">
+          <div class="wf-sidebar-logo">▣ IAM Explorer</div>
+          <div class="wf-nav-item active">
+            <svg class="wf-nav-icon" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+            Dashboard
+          </div>
+          <div class="wf-nav-item">
+            <svg class="wf-nav-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+            Identities
+          </div>
+          <div class="wf-nav-item">
+            <svg class="wf-nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1L1 4v4c0 4 3.1 7.7 7 8.9C14.9 15.7 15 8 15 8V4L8 1z"/></svg>
+            Policies
+          </div>
+          <div class="wf-nav-item">
+            <svg class="wf-nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v6H2l6 8 6-8H8V1z"/></svg>
+            Findings
+          </div>
+          <div class="wf-nav-item">
+            <svg class="wf-nav-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+            Settings
+          </div>
+          <div style="padding: 16px; margin-top: auto; border-top: 1px solid var(--border); margin-top: 180px;">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">ENVIRONMENT</div>
+            <div style="font-size:11px;color:var(--accent);margin-top:4px;">AWS · us-east-1</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">+ Azure · East US</div>
+          </div>
+        </div>
+        <!-- Main content -->
+        <div class="wf-content">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div>
+              <div style="font-size:16px;font-weight:600;">Permissions Overview</div>
+              <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">Tracking window: 90 days · Last scan: 2 min ago</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div class="wf-btn btn-ghost">Export Report</div>
+              <div class="wf-btn btn-primary">▶ Run Scan</div>
+            </div>
+          </div>
+
+          <!-- Metric row -->
+          <div class="wf-metric-row">
+            <div class="wf-metric">
+              <div class="wf-metric-label">PERMISSIONS CREEP INDEX</div>
+              <div class="wf-metric-value val-amber">68</div>
+              <div class="wf-metric-sub">↑ +4 from last week</div>
+            </div>
+            <div class="wf-metric">
+              <div class="wf-metric-label">ORPHANED ACCOUNTS</div>
+              <div class="wf-metric-value val-red">127</div>
+              <div class="wf-metric-sub">Zero activity, 90 days</div>
+            </div>
+            <div class="wf-metric">
+              <div class="wf-metric-label">LEAST PRIV. ADHERENCE</div>
+              <div class="wf-metric-value val-green">41%</div>
+              <div class="wf-metric-sub">Target: &gt;80%</div>
+            </div>
+            <div class="wf-metric">
+              <div class="wf-metric-label">UNUSED PERMISSIONS</div>
+              <div class="wf-metric-value val-blue">2,841</div>
+              <div class="wf-metric-sub">Across 3,214 identities</div>
+            </div>
+          </div>
+
+          <!-- PCI + tradeoff slider -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div class="wf-metric" style="padding:16px;">
+              <div class="wf-section-head"><span style="font-size:12px;">Risk Composition</span></div>
+              <div class="pci-row">
+                <div class="pci-donut">
+                  <div class="pci-donut-inner">
+                    <div class="pci-score">68</div>
+                    <div class="pci-sub">PCI Score</div>
+                  </div>
+                </div>
+                <div>
+                  <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Critical identities (28%)</div>
+                  <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>High risk (27%)</div>
+                  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Compliant (45%)</div>
+                </div>
+              </div>
+            </div>
+            <div class="wf-metric" style="padding:16px;">
+              <div class="wf-section-head"><span style="font-size:12px;">Remediation Tradeoff</span><small>Interactive</small></div>
+              <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">Slide to see impact of deploying N new scoped policies</div>
+              <div class="wf-slider-row">
+                <div class="wf-slider-label">Policies</div>
+                <div class="wf-slider" style="flex:1;">
+                  <div class="wf-slider-fill"></div>
+                  <div class="wf-slider-thumb"></div>
+                </div>
+                <div class="wf-slider-label">50</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">
+                <span>PCI Reduction: <span style="color:var(--green);font-weight:600;">−18</span></span>
+                <span>New score: <span style="color:var(--amber);font-weight:600;">50</span></span>
+              </div>
+              <div style="margin-top:8px;font-size:10px;color:var(--text3);">Est. remediation effort: <strong>~4 hrs</strong></div>
+            </div>
+          </div>
+
+          <!-- Identity table -->
+          <div class="wf-section-head">
+            <span>Identities by Risk</span>
+            <small>127 showing · Sort: Risk ↓</small>
+          </div>
+          <table class="wf-table">
+            <thead>
+              <tr>
+                <th>Identity / Role</th>
+                <th>Type</th>
+                <th>Risk</th>
+                <th>Permissions Used</th>
+                <th>Last Active</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span style="color:var(--text);">arn:aws:iam::prod/DataPipelineRole</span><br><span style="font-size:10px;color:var(--text3);">Attached: AdministratorAccess</span></td>
+                <td><span class="risk-pill" style="background:rgba(188,140,255,0.12);color:var(--purple);border-color:rgba(188,140,255,0.3);">ROLE</span></td>
+                <td><span class="risk-pill risk-critical">CRITICAL</span></td>
+                <td>
+                  <div class="usage-bar-wrap">
+                    <div class="usage-bar"><div class="usage-fill fill-red" style="width:8%"></div></div>
+                    <div class="usage-pct">8%</div>
+                  </div>
+                </td>
+                <td style="color:var(--text3);">6 days ago</td>
+                <td><div class="wf-btn btn-ghost" style="padding:4px 10px;font-size:11px;">Inspect →</div></td>
+              </tr>
+              <tr>
+                <td><span style="color:var(--text);">svc-account@project.iam</span><br><span style="font-size:10px;color:var(--text3);">Azure · Subscription: prod-001</span></td>
+                <td><span class="risk-pill" style="background:rgba(227,179,65,0.12);color:var(--amber);border-color:rgba(227,179,65,0.3);">SVC ACC</span></td>
+                <td><span class="risk-pill risk-high">HIGH</span></td>
+                <td>
+                  <div class="usage-bar-wrap">
+                    <div class="usage-bar"><div class="usage-fill fill-amber" style="width:22%"></div></div>
+                    <div class="usage-pct">22%</div>
+                  </div>
+                </td>
+                <td style="color:var(--text3);">14 days ago</td>
+                <td><div class="wf-btn btn-ghost" style="padding:4px 10px;font-size:11px;">Inspect →</div></td>
+              </tr>
+              <tr>
+                <td><span style="color:var(--text);">john.doe@company.com</span><br><span style="font-size:10px;color:var(--text3);">IAM User · Groups: dev-team, data-eng</span></td>
+                <td><span class="risk-pill" style="background:rgba(63,185,80,0.12);color:var(--green);border-color:rgba(63,185,80,0.3);">USER</span></td>
+                <td><span class="risk-pill risk-med">MEDIUM</span></td>
+                <td>
+                  <div class="usage-bar-wrap">
+                    <div class="usage-bar"><div class="usage-fill fill-amber" style="width:44%"></div></div>
+                    <div class="usage-pct">44%</div>
+                  </div>
+                </td>
+                <td style="color:var(--text3);">Yesterday</td>
+                <td><div class="wf-btn btn-ghost" style="padding:4px 10px;font-size:11px;">Inspect →</div></td>
+              </tr>
+              <tr>
+                <td><span style="color:var(--text);">LambdaExecutionRole-ETL</span><br><span style="font-size:10px;color:var(--text3);">Attached: S3FullAccess, DynamoDBFull</span></td>
+                <td><span class="risk-pill" style="background:rgba(188,140,255,0.12);color:var(--purple);border-color:rgba(188,140,255,0.3);">ROLE</span></td>
+                <td><span class="risk-pill risk-low">LOW</span></td>
+                <td>
+                  <div class="usage-bar-wrap">
+                    <div class="usage-bar"><div class="usage-fill fill-green" style="width:78%"></div></div>
+                    <div class="usage-pct">78%</div>
+                  </div>
+                </td>
+                <td style="color:var(--text3);">1 hr ago</td>
+                <td><div class="wf-btn btn-ghost" style="padding:4px 10px;font-size:11px;">Inspect →</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Annotations for Screen 1 -->
+    <div style="margin-top: 16px;">
+      <h3 style="margin-bottom: 12px; font-size: 13px; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; font-family: var(--mono);">Screen 1 Annotations</h3>
+      <div class="annotation"><div class="ann-num">1</div><div class="ann-text"><strong>Permissions Creep Index (PCI)</strong> — Single top-line metric quantifying the divergence between granted and used permissions. Gives CISOs a boardroom-ready number without needing to interpret raw data.</div></div>
+      <div class="annotation"><div class="ann-num">2</div><div class="ann-text"><strong>Remediation Tradeoff Slider</strong> — Interactive element showing how deploying N new scoped policies reduces PCI. Turns risk reduction into a game with a visible, quantified payoff. Directly addresses Sarah's "is it worth it?" hesitation.</div></div>
+      <div class="annotation"><div class="ann-num">3</div><div class="ann-text"><strong>Usage bar per identity</strong> — Ratio of used/granted permissions shown as a progress bar. Colour-coded red/amber/green by severity. Scannable at a glance — no number reading required for triage.</div></div>
+      <div class="annotation"><div class="ann-num">4</div><div class="ann-text"><strong>Multi-cloud unified view</strong> — AWS and Azure identities shown in one table, distinguished by the identity type badge. Reduces context-switching between console UIs.</div></div>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 2: IDENTITY DEEP DIVE ── -->
+  <div class="wf-screen" id="wf-s2">
+    <div class="wf-container">
+      <div class="wf-titlebar">
+        <div class="wf-dot" style="background:#ff5f57;"></div>
+        <div class="wf-dot" style="background:#febc2e;"></div>
+        <div class="wf-dot" style="background:#28c840;"></div>
+        <div class="wf-screen-label">IAM Permissions Explorer · Identity Deep Dive — DataPipelineRole</div>
+      </div>
+      <div class="wf-layout">
+        <div class="wf-sidebar">
+          <div class="wf-sidebar-logo">▣ IAM Explorer</div>
+          <div class="wf-nav-item">Dashboard</div>
+          <div class="wf-nav-item active">Identities</div>
+          <div class="wf-nav-item">Policies</div>
+          <div class="wf-nav-item">Findings</div>
+          <div class="wf-nav-item">Settings</div>
+          <div style="padding:12px 16px;margin-top:24px;border-top:1px solid var(--border);">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;">QUICK FILTERS</div>
+            <div style="font-size:11px;color:var(--accent);padding:4px 0;cursor:pointer;">▶ Critical only</div>
+            <div style="font-size:11px;color:var(--text2);padding:4px 0;cursor:pointer;">▶ Unused 90d+</div>
+            <div style="font-size:11px;color:var(--text2);padding:4px 0;cursor:pointer;">▶ Machine identities</div>
+            <div style="font-size:11px;color:var(--text2);padding:4px 0;cursor:pointer;">▶ Cross-account roles</div>
+          </div>
+        </div>
+        <div class="wf-content">
+          <!-- Header -->
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;">← Back to All Identities</div>
+              <div style="font-size:15px;font-weight:600;">DataPipelineRole</div>
+              <div style="font-size:11px;color:var(--text3);font-family:var(--mono);">arn:aws:iam::123456789:role/DataPipelineRole</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+              <span class="risk-pill risk-critical" style="font-size:12px;padding:5px 12px;">CRITICAL RISK</span>
+              <div class="wf-btn btn-primary">Generate Fix →</div>
+            </div>
+          </div>
+
+          <!-- Usage + Inheritance side by side -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <!-- Usage heatmap area -->
+            <div class="wf-metric" style="padding:16px;">
+              <div class="wf-section-head"><span style="font-size:12px;">Permission Usage (90 days)</span></div>
+              <div style="margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--text2);">s3:GetObject</span><div class="usage-bar-wrap" style="width:160px;"><div class="usage-bar"><div class="usage-fill fill-green" style="width:92%"></div></div><div class="usage-pct">92%</div></div></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--text2);">s3:PutObject</span><div class="usage-bar-wrap" style="width:160px;"><div class="usage-bar"><div class="usage-fill fill-green" style="width:67%"></div></div><div class="usage-pct">67%</div></div></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--text2);">dynamodb:GetItem</span><div class="usage-bar-wrap" style="width:160px;"><div class="usage-bar"><div class="usage-fill fill-amber" style="width:34%"></div></div><div class="usage-pct">34%</div></div></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--red2);">s3:DeleteBucket</span><div class="usage-bar-wrap" style="width:160px;"><div class="usage-bar"><div class="usage-fill fill-red" style="width:0%"></div></div><div class="usage-pct" style="color:var(--red);">0%</div></div></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--red2);">iam:PassRole</span><div class="usage-bar-wrap" style="width:160px;"><div class="usage-bar"><div class="usage-fill fill-red" style="width:0%"></div></div><div class="usage-pct" style="color:var(--red);">0%</div></div></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--red2);">ec2:TerminateInstances</span><div class="usage-bar-wrap" style="width:160px;"><div class="usage-bar"><div class="usage-fill fill-red" style="width:0%"></div></div><div class="usage-pct" style="color:var(--red);">0%</div></div></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--red2);">+ 2,834 more unused</span><div style="font-size:10px;color:var(--red);margin-right:4px;">never called</div></div>
+              </div>
+              <div style="font-size:10px;color:var(--text3);border-top:1px solid var(--border);padding-top:8px;">⚠ Source: AdministratorAccess · Grants ALL AWS permissions</div>
+            </div>
+
+            <!-- Inheritance graph -->
+            <div class="wf-metric" style="padding:16px;">
+              <div class="wf-section-head"><span style="font-size:12px;">Access Inheritance Chain</span></div>
+              <div class="inherit-graph">
+                <div class="inherit-line">
+                  <span class="inherit-node n-scp">SCP: DenyLeave</span>
+                  <div class="iline"></div>
+                  <span style="font-size:10px;color:var(--text3);">Org root</span>
+                </div>
+                <div style="padding-left:16px;">
+                  <div class="inherit-line">
+                    <span class="inherit-node n-policy">AdministratorAccess</span>
+                    <div class="iline"></div>
+                    <span style="font-size:10px;color:var(--text3);">Attached directly</span>
+                  </div>
+                  <div style="padding-left:16px;">
+                    <div class="inherit-line">
+                      <span class="inherit-node n-role">DataPipelineRole</span>
+                    </div>
+                    <div style="padding-left:16px;">
+                      <div class="inherit-line">
+                        <span class="inherit-node n-user">Lambda fn: etl-daily</span>
+                      </div>
+                      <div class="inherit-line">
+                        <span class="inherit-node n-user">CI: github-actions</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style="margin-top:10px;font-size:10px;color:var(--text3);">
+                  <span style="margin-right:12px;"><span class="inherit-node n-scp" style="padding:1px 5px;font-size:9px;">SCP</span> Service Control Policy</span>
+                  <span style="margin-right:12px;"><span class="inherit-node n-policy" style="padding:1px 5px;font-size:9px;">POL</span> Managed Policy</span>
+                  <span><span class="inherit-node n-role" style="padding:1px 5px;font-size:9px;">ROLE</span> IAM Role</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Finding details -->
+          <div style="background:rgba(248,81,73,0.06);border:1px solid rgba(248,81,73,0.25);border-radius:8px;padding:16px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <span style="color:var(--red);font-size:13px;font-weight:700;">⚠ Critical Finding</span>
+              <span class="risk-pill risk-critical">Wildcard Admin Attached</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:12px;">
+              This role has <strong>AdministratorAccess</strong> attached but has only called <strong>3 distinct AWS services</strong> in the last 90 days out of 300+ available. The role is assumed by a Lambda function and a CI pipeline — neither of which requires administrative access. This constitutes a <strong>critical attack path</strong>: a compromised CI token could pivot to full account takeover.
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div class="wf-btn btn-primary">Generate Least-Privilege Policy →</div>
+              <div class="wf-btn btn-danger">Detach Admin Policy</div>
+              <div class="wf-btn btn-ghost">JIT Access Instead</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <h3 style="margin-bottom: 12px; font-size: 13px; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; font-family: var(--mono);">Screen 2 Annotations</h3>
+      <div class="annotation"><div class="ann-num">1</div><div class="ann-text"><strong>Per-action usage frequency bars</strong> — Each permission listed with its 90-day invocation frequency. Engineers see exactly which actions are genuinely used vs never called, with dangerous unused permissions (DeleteBucket, iam:PassRole) surfaced in red to demand attention.</div></div>
+      <div class="annotation"><div class="ann-num">2</div><div class="ann-text"><strong>Visual inheritance chain</strong> — Indented tree shows how permissions flow: SCP → Managed Policy → Role → Assumers. The engineer can see at a glance that two machine identities (Lambda + GitHub Actions) are assuming this overprivileged role, making it a critical lateral movement risk.</div></div>
+      <div class="annotation"><div class="ann-num">3</div><div class="ann-text"><strong>Context-aware remediation options</strong> — Because the role is entirely unused for admin actions, three options are offered: generate a scoped replacement policy, directly detach the admin policy (hard revocation), or convert to JIT access. The choice respects the engineer's risk tolerance.</div></div>
+      <div class="annotation"><div class="ann-num">4</div><div class="ann-text"><strong>Plain-English finding summary</strong> — A narrative explanation of WHY this is a problem, not just WHAT it is. Addresses Sarah's need to justify remediation decisions to developers without writing her own impact analysis.</div></div>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 3: JSON DIFF ── -->
+  <div class="wf-screen" id="wf-s3">
+    <div class="wf-container">
+      <div class="wf-titlebar">
+        <div class="wf-dot" style="background:#ff5f57;"></div>
+        <div class="wf-dot" style="background:#febc2e;"></div>
+        <div class="wf-dot" style="background:#28c840;"></div>
+        <div class="wf-screen-label">IAM Permissions Explorer · Remediation — Policy Diff Review</div>
+      </div>
+      <div class="wf-layout">
+        <div class="wf-sidebar">
+          <div class="wf-sidebar-logo">▣ IAM Explorer</div>
+          <div class="wf-nav-item">Dashboard</div>
+          <div class="wf-nav-item active">Identities</div>
+          <div class="wf-nav-item">Policies</div>
+          <div class="wf-nav-item">Findings</div>
+          <div class="wf-nav-item">Settings</div>
+          <div style="padding:12px 16px;margin-top:24px;border-top:1px solid var(--border);">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;">CHANGE SUMMARY</div>
+            <div style="font-size:11px;color:var(--red);padding:3px 0;">− 2,841 removed</div>
+            <div style="font-size:11px;color:var(--green);padding:3px 0;">+ 6 added (scoped)</div>
+            <div style="font-size:11px;color:var(--text3);padding:3px 0;">= 3 unchanged</div>
+            <div style="margin-top:12px;padding:8px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.25);border-radius:6px;">
+              <div style="font-size:10px;color:var(--green);">Risk reduction</div>
+              <div style="font-size:14px;font-weight:700;color:var(--green);">−34 PCI pts</div>
+            </div>
+          </div>
+        </div>
+        <div class="wf-content">
+          <!-- Header -->
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+            <div>
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;">← Back to DataPipelineRole</div>
+              <div style="font-size:15px;font-weight:600;">Review Proposed Policy Changes</div>
+              <div style="font-size:11px;color:var(--text3);">Auto-generated based on 90-day usage analysis · Verify before deploying</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div class="wf-btn btn-ghost">↓ Export JSON</div>
+              <div class="wf-btn btn-ghost">Open PR in GitHub</div>
+              <div class="wf-btn btn-primary">✓ Deploy Now</div>
+            </div>
+          </div>
+
+          <!-- Confidence signal -->
+          <div style="background:rgba(227,179,65,0.08);border:1px solid rgba(227,179,65,0.25);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);">
+            ⚡ <strong style="color:var(--amber);">Confidence: High</strong> — No permissions were used in 90 days. No scheduled jobs detected. Last invocation: 6 days ago using only S3 and DynamoDB actions. <span style="color:var(--amber);">Review quarterly batch jobs before deploying.</span>
+          </div>
+
+          <!-- Side-by-side diff -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="diff-pane">
+              <div class="diff-header">
+                <div class="diff-header-label">Current Policy (AdministratorAccess)</div>
+                <div class="diff-stat"><span style="color:var(--red);">2,841 excess permissions</span></div>
+              </div>
+              <div class="diff-body">
+                <div class="diff-line"><span class="diff-sign neu">&nbsp;</span><span class="diff-code">{</span></div>
+                <div class="diff-line"><span class="diff-sign neu">&nbsp;</span><span class="diff-code">&nbsp;<span class="key">"Version"</span>: <span class="str">"2012-10-17"</span>,</span></div>
+                <div class="diff-line del"><span class="diff-sign del">−</span><span class="diff-code">&nbsp;<span class="key">"Statement"</span>: [{</span></div>
+                <div class="diff-line del"><span class="diff-sign del">−</span><span class="diff-code">&nbsp;&nbsp;<span class="key">"Effect"</span>: <span class="str">"Allow"</span>,</span></div>
+                <div class="diff-line del"><span class="diff-sign del">−</span><span class="diff-code">&nbsp;&nbsp;<span class="key">"Action"</span>: <span class="wc">"*"</span>,</span></div>
+                <div class="diff-line del"><span class="diff-sign del">−</span><span class="diff-code">&nbsp;&nbsp;<span class="key">"Resource"</span>: <span class="wc">"*"</span></span></div>
+                <div class="diff-line del"><span class="diff-sign del">−</span><span class="diff-code">&nbsp;}]</span></div>
+                <div class="diff-line"><span class="diff-sign neu">&nbsp;</span><span class="diff-code">}</span></div>
+              </div>
+            </div>
+            <div class="diff-pane">
+              <div class="diff-header">
+                <div class="diff-header-label">Proposed Policy (Least Privilege)</div>
+                <div class="diff-stat"><span style="color:var(--green);">+6 scoped actions</span></div>
+              </div>
+              <div class="diff-body">
+                <div class="diff-line"><span class="diff-sign neu">&nbsp;</span><span class="diff-code">{</span></div>
+                <div class="diff-line"><span class="diff-sign neu">&nbsp;</span><span class="diff-code">&nbsp;<span class="key">"Version"</span>: <span class="str">"2012-10-17"</span>,</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;<span class="key">"Statement"</span>: [{</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;<span class="key">"Effect"</span>: <span class="str">"Allow"</span>,</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;<span class="key">"Action"</span>: [</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;&nbsp;<span class="wc2">"s3:GetObject"</span>,</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;&nbsp;<span class="wc2">"s3:PutObject"</span>,</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;&nbsp;<span class="wc2">"dynamodb:GetItem"</span>,</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;&nbsp;<span class="wc2">"dynamodb:PutItem"</span>,</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;&nbsp;<span class="wc2">"dynamodb:Query"</span>,</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;&nbsp;<span class="wc2">"logs:CreateLogGroup"</span></span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;],</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;<span class="key">"Resource"</span>: [</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;&nbsp;<span class="wc2">"arn:aws:s3:::etl-*"</span>,</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;&nbsp;<span class="wc2">"arn:aws:dynamodb:us-east-1:..."</span></span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;&nbsp;]</span></div>
+                <div class="diff-line add"><span class="diff-sign add">+</span><span class="diff-code">&nbsp;}]</span></div>
+                <div class="diff-line"><span class="diff-sign neu">&nbsp;</span><span class="diff-code">}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deploy options -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;">
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;">
+              <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Test in Sandbox</div>
+              <div style="font-size:11px;color:var(--text3);">Deploy to staging, run integration tests, then promote</div>
+            </div>
+            <div style="background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:8px;padding:14px;text-align:center;">
+              <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:4px;">Open GitHub PR</div>
+              <div style="font-size:11px;color:var(--text3);">Add to IaC Terraform/CDK repo for review</div>
+            </div>
+            <div style="background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.25);border-radius:8px;padding:14px;text-align:center;">
+              <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px;">Deploy Directly</div>
+              <div style="font-size:11px;color:var(--text3);">Apply immediately. Rollback in 1 click if issues arise</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <h3 style="margin-bottom: 12px; font-size: 13px; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; font-family: var(--mono);">Screen 3 Annotations</h3>
+      <div class="annotation"><div class="ann-num">1</div><div class="ann-text"><strong>Confidence Signal Banner</strong> — Before seeing the diff, the engineer sees a plain-English confidence statement about WHY this recommendation is safe (or what to check). This directly addresses the #1 pain point: fear of breaking production. A quarterly-batch job warning appears proactively.</div></div>
+      <div class="annotation"><div class="ann-num">2</div><div class="ann-text"><strong>Synchronized side-by-side JSON diff</strong> — Left panel: current wildcard policy. Right panel: generated least-privilege policy. Colour-coded: red lines removed, green lines added. Panels scroll in sync. Key design choice: wildcards (<code>*</code>) are highlighted in red/green to make the "wildcard → specific action" replacement visually obvious.</div></div>
+      <div class="annotation"><div class="ann-num">3</div><div class="ann-text"><strong>Resource scoping visible in the diff</strong> — The new policy not only scopes actions but also scopes resources (e.g., <code>arn:aws:s3:::etl-*</code>). Engineers can verify the blast radius is correctly contained before approving.</div></div>
+      <div class="annotation"><div class="ann-num">4</div><div class="ann-text"><strong>Three deployment paths</strong> — Sandbox test, IaC PR, or direct deploy. This respects different org maturity levels. Every path includes rollback affordance. The IaC path is recommended (accent colour) to encourage GitOps practices.</div></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ════════════════ PAGE 4: FEATURES ════════════════ -->
+<div class="page" id="page-features">
+<div class="container">
+
+  <div class="section-label">Feature Write-up</div>
+  <h1 style="margin-bottom: 8px;">Proposed Features, Prioritisation & Success Metrics</h1>
+  <p style="max-width: 680px; margin-bottom: 32px;">A max 1-page equivalent write-up synthesising the design rationale, feature tiers, and the KPI matrix used to measure success.</p>
+
+  <!-- Features -->
+  <div class="card" style="margin-bottom: 24px;">
+    <h2 style="margin-bottom: 16px;">Feature Prioritisation</h2>
+    <p style="margin-bottom: 20px;">Features are ordered by the intersection of <strong>user impact</strong> (addresses a core pain point) and <strong>feasibility</strong> (achievable in an MVP timeframe without requiring deep ML infrastructure).</p>
+
+    <div class="feature-row">
+      <div class="feature-priority"><div class="priority-num p1">P1</div><div class="priority-label">CRITICAL</div></div>
+      <div class="feature-body">
+        <div class="feature-name">Unified Permission Gap Dashboard with PCI Score</div>
+        <div class="feature-desc">A single-screen view showing the Permissions Creep Index, Least Privilege Adherence Score, and orphaned account count — all derived from a backend gap analysis. Identities ranked by risk with usage bars. This is the entry point for every user session and must communicate "what's on fire" within 5 seconds of loading.</div>
+        <div class="feature-tags"><span class="tag">Addresses Pain #1</span><span class="tag">CISO-facing</span><span class="tag">MVP core</span><span class="tag">Multi-cloud</span></div>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-priority"><div class="priority-num p1">P1</div><div class="priority-label">CRITICAL</div></div>
+      <div class="feature-body">
+        <div class="feature-name">Per-Identity Inheritance Graph + Usage Breakdown</div>
+        <div class="feature-desc">Deep dive view for any identity: visualises the full access chain (SCP → Policy → Role → Principal), lists every granted action with its 90-day invocation frequency, and highlights dangerous unused permissions in red. Eliminates the need for Sarah to manually trace inheritance across 5 different console screens.</div>
+        <div class="feature-tags"><span class="tag">Addresses Pain #2</span><span class="tag">Security engineer-facing</span><span class="tag">MVP core</span></div>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-priority"><div class="priority-num p1">P1</div><div class="priority-label">CRITICAL</div></div>
+      <div class="feature-body">
+        <div class="feature-name">AI-Generated Policy + Synchronized JSON Diff Viewer</div>
+        <div class="feature-desc">Auto-generates a least-privilege replacement policy using 90-day usage data. Presents changes in a side-by-side diff with colour-coded additions/removals, scoped resource ARNs, and a confidence signal banner (flags potential quarterly jobs). One-click deployment with three paths: sandbox, IaC PR, or direct. This directly neutralises the fear of breakage by making changes transparent and reversible.</div>
+        <div class="feature-tags"><span class="tag">Addresses Pain #1</span><span class="tag">Addresses Pain #3</span><span class="tag">Core differentiator</span><span class="tag">MVP core</span></div>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-priority"><div class="priority-num p2">P2</div><div class="priority-label">HIGH</div></div>
+      <div class="feature-body">
+        <div class="feature-name">Remediation Tradeoff Slider</div>
+        <div class="feature-desc">Interactive slider on the dashboard: "If I fix N identities, my PCI drops by X." Gamifies risk reduction and helps security teams prioritise remediation sprints. Gives the CISO an "effort vs impact" view for resource allocation. Technically straightforward once the gap analysis engine is running.</div>
+        <div class="feature-tags"><span class="tag">CISO-facing</span><span class="tag">Engagement driver</span><span class="tag">Post-MVP v1</span></div>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-priority"><div class="priority-num p2">P2</div><div class="priority-label">HIGH</div></div>
+      <div class="feature-body">
+        <div class="feature-name">Developer Self-Service Policy Generator</div>
+        <div class="feature-desc">A simplified interface where developers can paste their Lambda/EC2 role ARN, select a date window, and receive a least-privilege policy draft without involving the security team. Addresses the centralisation bottleneck. Includes a "request review" button that creates a ticket for the security team — not a full bypass, but a massive acceleration.</div>
+        <div class="feature-tags"><span class="tag">Addresses Pain #3</span><span class="tag">Developer-facing</span><span class="tag">Post-MVP v1</span></div>
+      </div>
+    </div>
+
+    <div class="feature-row" style="border-bottom:none;">
+      <div class="feature-priority"><div class="priority-num p3">P3</div><div class="priority-label">MEDIUM</div></div>
+      <div class="feature-body">
+        <div class="feature-name">Just-in-Time (JIT) Temporary Elevation Workflow</div>
+        <div class="feature-desc">Replace standing privileged roles with on-demand temporary access: developer requests elevated permissions for N hours, approved by a security engineer, auto-expires. Prevents permanent privilege accumulation at its source. Requires deeper integration with identity providers (Okta, Azure AD) and is architecturally complex — ideal for a v2 milestone.</div>
+        <div class="feature-tags"><span class="tag">Zero Trust aligned</span><span class="tag">v2 roadmap</span><span class="tag">PAM maturity</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Originality note -->
+  <div class="card" style="margin-bottom: 24px; background: rgba(63,185,80,0.05); border-color: rgba(63,185,80,0.25);">
+    <h3 style="margin-bottom: 8px; color: var(--green);">Original Design Decisions</h3>
+    <p style="margin-bottom: 8px;"><strong>Confidence Signal over raw confidence scores:</strong> Rather than showing a numeric ML confidence score (opaque, distrusted), the diff view shows a plain-English explanation of the evidence: "No permissions used in 90 days. No scheduled jobs detected." This is more actionable and builds trust faster.</p>
+    <p style="margin-bottom: 0;"><strong>Three deployment paths, not one:</strong> Most tools offer "deploy" or "export." Our tool offers sandbox → IaC PR → direct deploy as distinct options, meeting teams where they are in GitOps maturity without forcing a single workflow.</p>
+  </div>
+
+  <!-- KPI Table -->
+  <h2 style="margin-bottom: 16px;">Success Metrics (KPIs)</h2>
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table class="kpi-table">
+      <thead>
+        <tr>
+          <th>KPI</th>
+          <th>Definition</th>
+          <th>Target</th>
+          <th>Business Impact</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="kpi-name">Least Privilege<br>Adherence Score</span></td>
+          <td>% of identities operating at or below minimum required access (granted vs used comparison)</td>
+          <td><span style="color:var(--green);font-weight:600;">&gt; 80%</span></td>
+          <td>Quantifies Zero Trust enforcement; reduces theoretical blast radius of credential compromise</td>
+        </tr>
+        <tr>
+          <td><span class="kpi-name">Orphaned Account<br>Ratio</span></td>
+          <td>% of active identities with zero telemetry activity over 90-day tracking period</td>
+          <td><span style="color:var(--green);font-weight:600;">&lt; 2%</span></td>
+          <td>Eliminates dormant backdoors; directly supports SOC2 and GDPR compliance audits</td>
+        </tr>
+        <tr>
+          <td><span class="kpi-name">Authorization<br>Failure Rate</span></td>
+          <td>% of API requests resulting in AccessDenied (total failed ÷ total requests)</td>
+          <td><span style="color:var(--green);font-weight:600;">&lt; 0.5%</span></td>
+          <td>Confirms policies are accurate — high rate indicates over-restriction breaking production workflows</td>
+        </tr>
+        <tr>
+          <td><span class="kpi-name">Remediation<br>Adoption Rate</span></td>
+          <td>% of generated policy recommendations that are deployed (sandbox, IaC, or direct) within 30 days</td>
+          <td><span style="color:var(--green);font-weight:600;">&gt; 60%</span></td>
+          <td>Measures tool trust and UX effectiveness; low rate indicates engineers fear the suggestions</td>
+        </tr>
+        <tr>
+          <td><span class="kpi-name">Lateral Movement<br>Risk Score</span></td>
+          <td>Composite: count of highly-privileged accounts × rate of standing privileges × presence of static credentials</td>
+          <td><span style="color:var(--green);font-weight:600;">Continuous ↓</span></td>
+          <td>Quantifies attacker's escalation potential following an initial breach</td>
+        </tr>
+        <tr>
+          <td><span class="kpi-name">Policy Review<br>Cycle Time</span></td>
+          <td>Average hours from developer policy request to approved deployment (measures bottleneck reduction)</td>
+          <td><span style="color:var(--green);font-weight:600;">&lt; 4 hrs</span></td>
+          <td>Directly measures developer friction reduction; baseline of 30–90 hrs manual review</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</div>
+
+<!-- ════════════════ PAGE 5: DEV ACTIONS ════════════════ -->
+<div class="page" id="page-dev">
+<div class="container">
+
+  <div class="section-label">Bonus · Development Action Items</div>
+  <h1 style="margin-bottom: 8px;">MVP Blueprint — Dev Handoff</h1>
+  <p style="max-width: 680px; margin-bottom: 32px;">Five concrete engineering tasks scoped for a Minimum Viable Product. Backend tasks marked <span style="color:var(--purple);">purple</span>, frontend tasks marked <span style="color:var(--green);">green</span>. Each item includes discussion points for the engineering team.</p>
+
+  <div class="task-card">
+    <div class="task-num t-backend">B1</div>
+    <div class="task-body">
+      <div class="task-title">Scalable Log Ingestion Pipeline</div>
+      <div class="task-meta">
+        <span class="risk-pill" style="background:rgba(188,140,255,0.1);color:var(--purple);border-color:rgba(188,140,255,0.3);">BACKEND</span>
+        <span class="risk-pill risk-med">SPRINT 1</span>
+        <span class="tag">Node.js / Java</span><span class="tag">SQS</span><span class="tag">Lambda</span>
+      </div>
+      <div class="task-desc">Build a resilient data pipeline to ingest CloudTrail logs (AWS) and Activity Logs (Azure) at scale. Architecture: stream logs into Amazon SQS → serverless function polls queue, parses nested JSON, handles network timeouts, deserialises events into queryable data objects, filters noise (read-only describe/list events). Must handle CloudTrail's payload truncation limit (102,401–131,072 character requests).</div>
+      <ul class="task-checklist">
+        <li>Configure CloudTrail S3 delivery + SQS integration with dead-letter queues for parsing failures</li>
+        <li>Handle Azure Activity Log schema inconsistencies — some resource providers omit evidence blocks entirely</li>
+        <li>Normalise API version strings: <span class="code-inline">ListDistributions2017_03_25</span> → <span class="code-inline">cloudfront:ListDistributions</span> using regex classifiers</li>
+        <li>Discussion: Should data events (S3 GetObject, Lambda invoke) be opt-in or always-on? Cost and noise tradeoff.</li>
+        <li>Discussion: How do we handle <span class="code-inline">sts:GetCallerIdentity</span> (always allowed, skews usage analysis)?</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="task-card">
+    <div class="task-num t-backend">B2</div>
+    <div class="task-body">
+      <div class="task-title">Gap Analysis & Heuristic Mapping Engine</div>
+      <div class="task-meta">
+        <span class="risk-pill" style="background:rgba(188,140,255,0.1);color:var(--purple);border-color:rgba(188,140,255,0.3);">BACKEND</span>
+        <span class="risk-pill risk-critical">SPRINT 1–2</span>
+        <span class="tag">Python</span><span class="tag">botocore mapping</span><span class="tag">GraphDB</span>
+      </div>
+      <div class="task-desc">Core algorithmic engine that maps deserialized CloudTrail events to IAM privilege names using a maintained translation dictionary (SDK endpoints ↔ IAM prefixes). Executes temporal gap analysis: compare 90-day usage array against policies currently attached to the evaluated role. Output: explicit list of unused actions per identity, plus a permissions graph for inheritance chain traversal.</div>
+      <ul class="task-checklist">
+        <li>Build and maintain IAM ↔ API mapping dictionary (critical: <span class="code-inline">ses</span>→<span class="code-inline">email</span>, <span class="code-inline">cloudwatch</span>→<span class="code-inline">monitoring</span>, etc.)</li>
+        <li>Handle IAM services mapping to multiple API endpoints (e.g. <span class="code-inline">lex</span> → <span class="code-inline">models.lex</span> + <span class="code-inline">runtime.lex</span>)</li>
+        <li>Store identity inheritance graphs in a graph database (Neptune / Neo4j) for efficient traversal queries</li>
+        <li>Discussion: How do we handle Azure RBAC's <span class="code-inline">authorization.evidence.roleAssignmentId</span> when multiple concurrent role paths exist?</li>
+        <li>Discussion: Configurable tracking window (30d / 90d / 180d) — how do we surface "last used" for infrequent batch jobs?</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="task-card">
+    <div class="task-num t-backend">B3</div>
+    <div class="task-body">
+      <div class="task-title">Automated Least-Privilege Policy Generation Service</div>
+      <div class="task-meta">
+        <span class="risk-pill" style="background:rgba(188,140,255,0.1);color:var(--purple);border-color:rgba(188,140,255,0.3);">BACKEND</span>
+        <span class="risk-pill risk-high">SPRINT 2</span>
+        <span class="tag">JSON synthesis</span><span class="tag">IAM API</span><span class="tag">Terraform</span>
+      </div>
+      <div class="task-desc">Synthesises gap analysis output into a new least-privilege JSON policy document. Generation logic must safely scope down wildcards (e.g. <span class="code-inline">s3:*</span> → specific used actions), preserve necessary resource constraints, tags, and conditional context keys from the original policy. Must produce valid IAM JSON that passes AWS policy simulator validation before being surfaced to the UI.</div>
+      <ul class="task-checklist">
+        <li>Wildcard expansion: when a role has <span class="code-inline">dynamodb:*</span> but only calls 3 actions, emit only those 3 actions</li>
+        <li>Resource scoping: where CloudTrail captures the specific resource ARN, include it in the generated policy</li>
+        <li>Preserve Condition blocks from original policy (IP restrictions, MFA requirements, time windows)</li>
+        <li>Generate Terraform / CDK equivalents alongside JSON for teams using IaC</li>
+        <li>Discussion: Should we always require a human approval step, or allow auto-remediation for zero-usage orphaned accounts?</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="task-card">
+    <div class="task-num t-frontend">F1</div>
+    <div class="task-body">
+      <div class="task-title">CIEM Dashboard + Metrics Visualisation</div>
+      <div class="task-meta">
+        <span class="risk-pill" style="background:rgba(63,185,80,0.1);color:var(--green);border-color:rgba(63,185,80,0.3);">FRONTEND</span>
+        <span class="risk-pill risk-high">SPRINT 2</span>
+        <span class="tag">React / Next.js</span><span class="tag">D3.js</span><span class="tag">WebSocket</span>
+      </div>
+      <div class="task-desc">Build the primary dashboard (Screen 1 of wireframes) rendering the Permissions Creep Index, Least Privilege Adherence Score, orphaned account count, and sortable identity table with usage bars. Must handle real-time scan results via WebSocket or SSE. Graph visualisation library (D3 or Recharts) to render the PCI donut and remediation tradeoff slider. Dark-mode native, responsive down to 1280px.</div>
+      <ul class="task-checklist">
+        <li>PCI donut chart with animated transition on score change — provides immediate visual feedback on remediation impact</li>
+        <li>Identity table: virtual scrolling for 10,000+ identities; filter by environment (AWS/Azure), type (user/role/svc), risk level</li>
+        <li>Remediation tradeoff slider: debounced API call returns projected PCI reduction for N remediated identities</li>
+        <li>Discussion: Should the scan be on-demand (button) or continuous background polling? Implications for API rate limits and cost.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="task-card">
+    <div class="task-num t-frontend">F2</div>
+    <div class="task-body">
+      <div class="task-title">Side-by-Side JSON Diff Viewer + Deployment UI</div>
+      <div class="task-meta">
+        <span class="risk-pill" style="background:rgba(63,185,80,0.1);color:var(--green);border-color:rgba(63,185,80,0.3);">FRONTEND</span>
+        <span class="risk-pill risk-critical">SPRINT 3</span>
+        <span class="tag">React</span><span class="tag">Monaco Editor</span><span class="tag">GitHub API</span>
+      </div>
+      <div class="task-desc">The deep-nested JSON diff viewer (Screen 3 of wireframes). Dual-pane layout with synchronized scrolling, syntax highlighting, and colour-coded diff indicators (red removals, green additions) that bubble up to parent nodes. JSON normalisation to prevent false positives from key ordering differences. Deployment affordances: sandbox test, GitHub PR creation (requires OAuth), and direct AWS/Azure API deployment with rollback button.</div>
+      <ul class="task-checklist">
+        <li>Use Monaco Editor (VS Code's engine) or <span class="code-inline">react-diff-viewer</span> as base — do NOT build a diff engine from scratch</li>
+        <li>JSON normalise before diff: sort keys alphabetically, strip whitespace variation — eliminates false positives</li>
+        <li>Collapsible node trees (both panels sync collapse state) — critical for large policies with 50+ statement blocks</li>
+        <li>GitHub PR creation: pre-fills PR title, description, and reviewer assignment from the security team roster</li>
+        <li>Confidence signal banner: surface "last used" timestamp, detected cronjob patterns, quarterly batch job heuristics</li>
+        <li>Discussion: Rollback mechanism — should we snapshot the previous policy version before applying changes?</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="background: rgba(31,111,235,0.06); border-color: rgba(31,111,235,0.25); margin-top: 8px;">
+    <h3 style="margin-bottom: 12px;">Technical Risk Register</h3>
+    <div class="grid-2">
+      <div>
+        <div class="pain-title" style="color:var(--red);margin-bottom:4px;">High: CloudTrail data event cost</div>
+        <div class="pain-body">Enabling S3 GetObject logging on large buckets can cost hundreds of dollars/month. Mitigation: offer opt-in per bucket with cost estimator shown before enabling.</div>
+      </div>
+      <div>
+        <div class="pain-title" style="color:var(--red);margin-bottom:4px;">High: IAM ↔ API mapping drift</div>
+        <div class="pain-body">AWS adds ~200 new IAM actions per year. Mapping dictionary needs automated testing against live AWS documentation on every release.</div>
+      </div>
+      <div>
+        <div class="pain-title" style="color:var(--amber);margin-bottom:4px;">Medium: Azure RBAC opacity</div>
+        <div class="pain-body">Azure's <span class="code-inline">authorization.evidence</span> field is inconsistently emitted across resource providers. Need provider-specific parsing fallbacks.</div>
+      </div>
+      <div>
+        <div class="pain-title" style="color:var(--amber);margin-bottom:4px;">Medium: False positive suppression</div>
+        <div class="pain-body">Actions that run quarterly (batch jobs, compliance reports) will appear as "unused" in a 90-day window. Need job schedule inference to prevent false positive remediation suggestions.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+  // Tab navigation
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.page;
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('page-' + target).classList.add('active');
+      window.scrollTo(0, 0);
+    });
+  });
+
+  // Screen navigation for wireframes
+  document.querySelectorAll('.screen-nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.screen;
+      document.querySelectorAll('.screen-nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.wf-screen').forEach(s => s.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('wf-' + target).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
